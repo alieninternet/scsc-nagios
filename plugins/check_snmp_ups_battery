@@ -148,8 +148,8 @@ my ($snmp_session, $snmp_error) = Net::SNMP->session(
     -timeout => $timeout,
 );
 
-# Grab interesting details from the access point
-check_accesspoint();
+# Grab interesting details
+check_device();
     
 # Shut down the SNMP session
 $snmp_session->close();
@@ -200,7 +200,7 @@ sub grab_snmp_value {
 #
 # Grab lots of interesting info about the device
 #
-sub check_accesspoint {
+sub check_device {
     # Grab some values
     $ups_batt_status = grab_snmp_value($oid_ups_batt_status);
     $ups_batt_timeleft = grab_snmp_value($oid_ups_batt_timeleft);
@@ -296,7 +296,7 @@ Battery Monitoring
 Usage: $script -H <hostname> [-C <community>] [-w <%>,<s>] [-c <%>,<s>]
 
 Options:
-    -H 	Hostname or IP address of the access point
+    -H 	Hostname or IP address of the UPS
     -C 	SNMP read community (default is public)
     -w  Warning level charge percentage and remaining battery seconds
     -c  Critical level charge percentage and remaining battery seconds

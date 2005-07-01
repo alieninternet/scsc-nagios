@@ -182,8 +182,8 @@ my ($snmp_session, $snmp_error) = Net::SNMP->session(
     -timeout => $timeout,
 );
 
-# Grab interesting details from the access point
-check_accesspoint();
+# Grab interesting details
+check_device();
     
 # Shut down the SNMP session
 $snmp_session->close();
@@ -234,7 +234,7 @@ sub grab_snmp_value {
 #
 # Grab lots of interesting info about the device
 #
-sub check_accesspoint {
+sub check_device {
     # Grab some values
     $xups_emp_temp = grab_snmp_value($oid_xups_emp_temp);
     $xups_emp_humidity = grab_snmp_value($oid_xups_emp_humidity);
@@ -256,7 +256,7 @@ sub check_accesspoint {
 	# Add the temperature
 	$returnstr = 
 	    "$returnstr" .
-	    "Temperature: $xups_emp_temp\&#x2103";
+	    "Temperature: $xups_emp_temp\&#x2103;";
     } else {
 	status(2); # Critical
 	$returnstr = "Temperature Unavailable";
@@ -325,7 +325,7 @@ Check an PowerWare UPS' EMP device via SNMP
 Usage: $script -H <hostname> [-C <community>] [-w <%>,<s>] [-c <%>,<s>]
 
 Options:
-    -H 	Hostname or IP address of the access point
+    -H 	Hostname or IP address of the PowerWare UPS
     -C 	SNMP read community (default is public)
     -w  Warning level for temperature max and humidity max/min
     -c  Critical level for temperature max and humidity max/min

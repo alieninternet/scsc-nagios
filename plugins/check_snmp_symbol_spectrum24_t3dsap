@@ -142,7 +142,7 @@ my ($snmp_session, $snmp_error) = Net::SNMP->session(
 );
 
 # Grab interesting details from the access point
-check_accesspoint();
+check_device();
     
 # Shut down the SNMP session
 $snmp_session->close();
@@ -193,7 +193,7 @@ sub grab_snmp_value {
 #
 # Grab lots of interesting info about the access point :)
 #
-sub check_accesspoint {
+sub check_device {
     # Grab some values
     $ap_radiostatus = grab_snmp_value($oid_ap_radiostatus);
     $ap_location = grab_snmp_value($oid_ap_location);
