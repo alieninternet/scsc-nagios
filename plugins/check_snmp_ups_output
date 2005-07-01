@@ -73,10 +73,8 @@ $ups_output_power = 0;
 $ups_output_load = 0;
 
 # Thresholds
-$critical_charge = -1;
-$warning_charge = -1;
-$critical_timeleft = -1;
-$warning_timeleft = -1;
+$critical_load = -1;
+$warning_load = -1;
 
 # Our return status - we start with 0 (OK) and hope for the best
 $status = 0;
@@ -90,7 +88,7 @@ $community = "public";
 
 
 # Grab the command line options
-getopts("h:H:C:i:");
+getopts("h:H:C:w:c:i:");
 
 # If we didn't get any options, show some help and quit
 if ($opt_h){
@@ -120,6 +118,39 @@ if (defined($opt_i)){
     if ($ups_output_index < 1) {
 	$ups_output_index = 1;
     }
+}
+
+# Get the warning load level if it was given
+if (defined($opt_w)) {
+    $warning_load = $opt_w;
+
+    # Check it.. It must be a percentage!
+    if (($warning_load < 0) ||
+	($warning_load > 100)) {
+	print "Warning level must be a percentage value (0..100)\n";
+	exit(-1); # Unknown
+    }
+}
+
+# Get the critical load level if it was given
+if (defined($opt_c)) {
+    $critical_load = $opt_c;
+
+    # Check it.. It must be a percentage!
+    if (($critical_load < 0) ||
+	($critical_load > 100)) {
+	print "Critical level must be a percentage value (0..100)\n";
+	exit(-1); # Unknown
+    }
+}
+
+# Make sure the critical level is higher than the warning level, if
+# both values were given
+if (($warning_load != -1) &&
+    ($critical_load != -1) &&
+    ($critical_load <= $warning_load)) {
+    print "Critical load threshold must be higher than the warning level!\n";
+    exit(-1); # Unknown
 }
 
 
@@ -276,9 +307,22 @@ sub check_device {
 	# If we have the output "true" power, add that
 	if (!($ups_output_load eq "") &&
 	    ($ups_output_load != 0)) {
-	    $returnstr =
-		"$returnstr " .
-		"($ups_output_load\% load)";
+	    # Start the load bit of the output string
+	    $returnstr = "$returnstr (";
+
+	    # Is the load value over any thresholds?
+	    if (($critical_load != -1) &&
+		($ups_output_load >= $critical_load)) {
+		status(2); # Critical
+		$returnstr = "$returnstr\Critical: ";
+	    } elsif (($warning_load != -1) &&
+		     ($ups_output_load >= $warning_load)) {
+		status(1); # Warning
+		$returnstr = "$returnstr\Warning: ";
+	    }
+
+	    # Finish off the load bit of the output string
+	    $returnstr = "$returnstr" . "$ups_output_load\% load)";
 	}
     } else {
 	status(2); # Critical
@@ -314,6 +358,8 @@ Options:
     -H 	Hostname or IP address of the UPS
     -C 	SNMP read community (default is public)
     -i  Output index number (defaults to 1 if not set)
+    -w  Warning output utilisation level (percentage)
+    -c  Critical output utilisation level (percentage)
 
 USAGE
      exit(-1); # Unknown
