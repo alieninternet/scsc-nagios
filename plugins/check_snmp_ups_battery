@@ -109,36 +109,71 @@ if (defined($opt_C)){
     $community = $opt_C;
 }
 
-# Grab the warning and critical MU association levels, if provided
+# Grab the warning thresholds
 if (defined($opt_w)) {
-    $mu_warning = $opt_w;
+    my @warning = split(/\,/, $opt_w);
 
-    # Make sure this is a number, and a valid one at that..
-    if ($mu_warning <= 0) {
-#	print "Warning level must be a number of mobile units.\n";
-#	exit(-1); # Unknown
+    if (!($warning[0] eq "")) {
+	$warning_charge = $warning[0];
+
+	# Make sure this is a percentage
+	if (($warning_charge < 0) ||
+	    ($warning_charge > 100)) {
+	    print "Charge warning threshold must be a percentage\n";
+	    exit(-1); # Unknown
+	}
     }
-} else {
-    $mu_warning = -1;
+    if (!($warning[1] eq "")) {
+	$warning_timeleft = $warning[1];
+
+	# Make sure this is a positive time value
+	if ($warning_timeleft <= 0) {
+	    print "The warning remaining time left is not a positive number\n";
+	    exit(-1); # Unknown
+	}
+    }
 }
+
+# Grab the critical thresholds
 if (defined($opt_c)) {
-    $mu_critical = $opt_c;
+    my @critical = split(/\,/, $opt_c);
 
-    # Make sure this is a number, and a valid one at that..
-    if ($mu_critical <= 0) {
-#	print "Critical level must be a number of mobile units.\n";
-#	exit(-1); # Unknown
+    if (!($critical[0] eq "")) {
+	$critical_charge = $critical[0];
+
+	# Make sure this is a percentage
+	if (($critical_charge < 0) ||
+	    ($critical_charge > 100)) {
+	    print "Charge critical threshold must be a percentage\n";
+	    exit(-1); # Unknown
+	}
     }
-} else {
-    $mu_critical = -1;
+    if (!($critical[1] eq "")) {
+	$critical_timeleft = $critical[1];
+
+	# Make sure this is a positive time value
+	if ($critical_timeleft <= 0) {
+	    print "The critical remaining time left is not a positive number\n";
+	    exit(-1); # Unknown
+	}
+    }
 }
 
-# If both the critical and warning levels were given, check warning is lower..
-if (($mu_warning >= 0) && ($mu_critical >= 0) &&
-    ($mu_warning > $mu_critical)) {
-#    print "Warning level is greater than the critical level!\n";
-#    exit(-1); # Unknown
+# If we received both warning and critical times/charge values, make sure
+# the warning values are higher than the critical values
+if (($warning_charge != -1) &&
+    ($critical_charge != -1) &&
+    ($critical_charge >= $warning_charge)) {
+    print "The critical charge threshold must be smaller than the warning\n";
+    exit(-1); # Unknown
 }
+if (($warning_timeleft != -1) &&
+    ($critical_timeleft != -1) &&
+    ($critical_timeleft >= $warning_timeleft)) {
+    print "The critical remaining time threshold must be smaller than the warning\n";
+    exit(-1); # Unknown
+}
+
 
 # Initialise the SNMP session via the Net::SNMP perl module
 my ($snmp_session, $snmp_error) = Net::SNMP->session(
@@ -231,14 +266,28 @@ sub check_device {
     # Do we know if we are on battery or not?
     if (!($ups_batt_timeleft eq "") &&
 	($ups_batt_timeleft != 0)) {
-	# We're on battery power..
-	status(1); # Warning
+	# We're on battery power.. If we have no warning/critical, warn anyway
+	if (($warning_timeleft == -1) &&
+	    ($critical_timeleft == -1)) {
+	    status(1); # Warning
+	}
 	   
         # Mention how much time we have left..
 	$returnstr =
 	    "$returnstr, " .
 	    "Inverter Active: " .
 	    "~$ups_batt_timeleft seconds remaining";
+
+	# Have we broken a threshold here?
+	if (($critical_timeleft != -1) &&
+	    ($ups_batt_timeleft <= $critical_timeleft)) {
+	    status(2); # Critical
+	    $returnstr = "$returnstr (Critical)";
+	} elsif (($warning_timeleft != -1) &&
+		 ($ups_batt_timeleft <= $warning_timeleft)) {
+	    status(1); # Warning
+	    $returnstr = "$returnstr (Warning)";
+	}
     }
 
     # If we have the battery charge, add that
@@ -246,6 +295,17 @@ sub check_device {
 	$returnstr =
 	    "$returnstr, " .
 	    "$ups_batt_charge\% charge";
+
+	# Have we broken a threshold?
+	if (($critical_charge != -1) &&
+	    ($ups_batt_charge <= $critical_charge)) {
+	    status(2); # Critical
+	    $returnstr = "$returnstr (Critical)";
+	} elsif (($warning_charge != -1) &&
+		 ($ups_batt_charge <= $warning_charge)) {
+	    status(1); # Warning
+	    $returnstr = "$returnstr (Warning)";
+	}
     }
 
     # If we have the battery voltage, add that
