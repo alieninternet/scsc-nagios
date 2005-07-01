@@ -1,0 +1,320 @@
+#! /usr/bin/perl
+###############################################################################
+#                                                                             #
+#                 Check an RFC1628-compliant UPS via SNMP                     #
+#                             (Output tests)                                  #
+#                                                                             #
+###############################################################################
+#
+# Copyright (c) 2005 Simon Butcher <simon@butcher.name>
+#  
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA    02111-1307    USA
+#
+##############################################################################
+#
+#
+# Performance data:
+#    +-------+-----------------------------------------------+
+#    | Field | Description                                   |
+#    +-------+-----------------------------------------------+
+#    |   1   | Output Line Index                             |
+#    |   2   | Output Frequency (Hertz)                      |
+#    |   3   | Output Voltage (Volts)                        |
+#    |   4   | Output Current (RMS Amps)                     |
+#    |   5   | Output Power (Watts)                          |
+#    |   6   | Output Load (Percent)                         |
+#    |   7   | Output Source                                 |
+#    +-------+-----------------------------------------------+
+#
+##############################################################################
+
+
+use Net::SNMP;
+use Getopt::Std;
+
+$script = "check_snmp_ups_output";
+$script_version = "1.0";
+
+# SNMP options
+$version = "1";
+$timeout = 2;
+
+# Various SNMP OID prefixes to look at..
+$oid_ups_output_source  = ".1.3.6.1.2.1.33.1.4.1";
+    # 1 = other, 2 = none, 3 = normal, 4 = bypass, 5 = battery,
+    # 6 = booster, 7 = reducer
+$oid_ups_output_freq    = ".1.3.6.1.2.1.33.1.4.2"; # 0.1 Hz
+$oid_ups_output_numlines = ".1.3.6.1.2.1.33.1.4.3";
+$oid_ups_output_table   = ".1.3.6.1.2.1.33.1.4.4.1.";
+$oid_ups_output_voltage = "2."; # Volts
+$oid_ups_output_current = "3."; # 0.1 RMS Amps
+$oid_ups_output_power   = "4."; # true opwer, watts
+$oid_ups_output_load    = "5."; # percent
+
+# The information we returned
+$ups_output_index = 1;
+$ups_output_source = 0;
+$ups_output_freq = 0;
+$ups_output_voltage = 0;
+$ups_output_current = 0;
+$ups_output_power = 0;
+$ups_output_load = 0;
+
+# Thresholds
+$critical_charge = -1;
+$warning_charge = -1;
+$critical_timeleft = -1;
+$warning_timeleft = -1;
+
+# Our return status - we start with 0 (OK) and hope for the best
+$status = 0;
+
+# Our return string with lots of interesting stuff in it
+$returnstr = "";
+
+# The SNMP hostname and community to use for the query
+$hostname = "";
+$community = "public";
+
+
+# Grab the command line options
+getopts("h:H:C:i:");
+
+# If we didn't get any options, show some help and quit
+if ($opt_h){
+    usage();
+    exit(-1); # Unknown
+}
+
+# Get the hostname, if it was given..
+if (defined($opt_H)){
+    $hostname = $opt_H;
+} else {
+    # We really need a hostname
+    usage();
+    exit(-1); # Unknown
+}
+
+# Get the SNMP community
+if (defined($opt_C)){
+    $community = $opt_C;
+}
+
+# Get the index if it was given
+if (defined($opt_i)){
+    $ups_output_index = $opt_i;
+
+    # Make sure the index is at least 1..
+    if ($ups_output_index < 1) {
+	$ups_output_index = 1;
+    }
+}
+
+
+# Initialise the SNMP session via the Net::SNMP perl module
+my ($snmp_session, $snmp_error) = Net::SNMP->session(
+    -community => $community,
+    -hostname => $hostname,
+    -version => $version,
+    -timeout => $timeout,
+);
+
+# Grab interesting details
+check_device();
+    
+# Shut down the SNMP session
+$snmp_session->close();
+
+# Return the return string and return status
+print "$returnstr\n";
+exit($status);
+
+
+##############################################################################
+##############################################################################
+#
+# Change the status level
+#
+sub status {
+    my $newstatus = $_[0];
+
+    # If the new status is greater than the old status, change the old status
+    if ($newstatus > $status) {
+	$status = $newstatus;
+    }
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Grab a value from snmp
+#
+sub grab_snmp_value {
+    my $this_oid = $_[0];
+    my $this_value = "";
+
+    # Try to grab the OID's value, if it exists
+    if (defined($snmp_session->get_request($this_oid))) {
+        foreach ($snmp_session->var_bind_names()) {
+            $this_value = $snmp_session->var_bind_list()->{$_};
+        }
+    }
+
+    # Return the value we got..
+    return $this_value;
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Grab lots of interesting info about the device
+#
+sub check_device {
+    # Grab some values
+    $ups_output_source = grab_snmp_value($oid_ups_output_source);
+    $ups_output_freq = grab_snmp_value($oid_ups_output_freq) * 0.1;
+
+    # If we have an index, try to find some other values too
+    if ($ups_output_index != 0) {
+	$ups_output_voltage =
+	    grab_snmp_value($oid_ups_output_table .
+			    $oid_ups_output_voltage .
+			    $ups_output_index);
+	$ups_output_current = 
+	    grab_snmp_value($oid_ups_output_table .
+			    $oid_ups_output_current .
+			    $ups_output_index) * 0.1;
+	$ups_output_power = 
+	    grab_snmp_value($oid_ups_output_table .
+			    $oid_ups_output_power .
+			    $ups_output_index);
+	$ups_output_load = 
+	    grab_snmp_value($oid_ups_output_table .
+			    $oid_ups_output_load .
+			    $ups_output_index);
+
+	# Start the return string..
+	$returnstr =
+	    "Output Line " . $ups_output_index;
+    } else {
+	# Start the return string without an output line number
+	$returnstr =
+	    "Output";
+    }
+
+    # Try and find the UPS output source type
+    if ($ups_output_source == 1) { # Other
+	status(1); # Warning
+	$returnstr = "$returnstr Other Source:";
+    } elsif ($ups_output_source == 2) { # None
+	status(2); # Critical
+	$returnstr = "$returnstr NO POWER:";
+    } elsif ($ups_output_source == 3) { # Normal
+	status(0); # OK
+	$returnstr = "$returnstr Normal:";
+    } elsif ($ups_output_source == 4) { # Bypass
+	status(1); # Warning
+	$returnstr = "$returnstr BYPASS:";
+    } elsif ($ups_output_source == 5) { # Battery
+	status(2); # Critical
+	$returnstr = "$returnstr INVERTER:";
+    } elsif ($ups_output_source == 6) { # Booster (power sag)
+	status(1); # Warning
+	$returnstr = "$returnstr BOOSTING: ";
+    } elsif ($ups_output_source == 7) { # Reducer (power surge)
+	status(1); # Warning
+	$returnstr = "$returnstr REDUCING:";
+    } else {
+	status(-1); # Unknown
+	$returnstr = "$returnstr UNKNOWN:";
+    }
+
+    # If we have the output voltage, add that
+    if (!($ups_output_voltage eq "")) {
+	$returnstr =
+	    "$returnstr " .
+	    "$ups_output_voltage VAC";
+
+	# If we have the output current, add that
+	if (!($ups_output_current eq "") &&
+	    ($ups_output_current != 0)) {
+	    $returnstr =
+		"$returnstr, " .
+		"$ups_output_current\A";
+	}
+	
+	# If we have the output frequency, add that
+	if (!($ups_output_freq eq "") &&
+	    ($ups_output_freq != 0)) {
+	    $returnstr =
+		"$returnstr, " .
+		"$ups_output_freq\Hz";
+	}
+	
+	# If we have the output "true" power, add that
+	if (!($ups_output_power eq "") &&
+	    ($ups_output_power != 0)) {
+	    $returnstr =
+		"$returnstr, " .
+		"$ups_output_power\W";
+	}
+	
+	# If we have the output "true" power, add that
+	if (!($ups_output_load eq "") &&
+	    ($ups_output_load != 0)) {
+	    $returnstr =
+		"$returnstr " .
+		"($ups_output_load\% load)";
+	}
+    } else {
+	status(2); # Critical
+	$returnstr = "$returnstr is ABSENT from the UPS!";
+    }
+	
+    # Add on some performance monitoring stuff to the return string :)
+    $returnstr =
+	"$returnstr" .
+	"|$ups_output_index;$ups_output_freq;$ups_output_voltage" .
+	";$ups_output_current;$ups_output_power;$ups_output_load" .
+	";$ups_output_source" .
+	";";
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Usage information
+#
+sub usage {
+    print << "USAGE";
+$script ($script_version)
+Copyright (c) 2005 Simon Butcher <simon@butcher.name>
+
+Monitor the status of an RFC1628-compliant UPS via SNMP:
+Output Monitoring
+
+Usage: $script -H <hostname> [-C <community>] [-i <i>]
+
+Options:
+    -H 	Hostname or IP address of the UPS
+    -C 	SNMP read community (default is public)
+    -i  Output index number (defaults to 1 if not set)
+
+USAGE
+     exit(-1); # Unknown
+}
