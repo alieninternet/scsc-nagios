@@ -42,7 +42,7 @@ use Net::SNMP;
 use Getopt::Std;
 
 $script = "check_snmp_powerware_xups_emp";
-$script_version = "1.0";
+$script_version = "1.1";
 
 # SNMP options
 $version = "1";
@@ -256,7 +256,7 @@ sub check_device {
 	# Add the temperature
 	$returnstr = 
 	    "$returnstr" .
-	    "Temperature: $xups_emp_temp\&#x2103;";
+	    "Temperature: $xups_emp_temp\&#8451;"; # &#x2103;
     } else {
 	status(2); # Critical
 	$returnstr = "Temperature Unavailable";
