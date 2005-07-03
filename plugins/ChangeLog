@@ -3,7 +3,8 @@ Release 2005????
 ----------------
  * Cleaned up code comments, labels, help	
  * Added in check_snmp_ups_output	
- * Restored the new check_snmp_ups_battery (with warning/critical checks!)
+ * Restored the new check_snmp_ups_battery and check_snmp_ups_input
+   (with warning/critical checks!)
 	
 Release 20050628
 ----------------
