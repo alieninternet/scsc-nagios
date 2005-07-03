@@ -5,6 +5,9 @@ Release 2005????
  * Added in check_snmp_ups_output	
  * Restored the new check_snmp_ups_battery and check_snmp_ups_input
    (with warning/critical checks!)
+ * Changed the degrees-celcius sign in the PowerWare EMP check output to
+   use a decimal number instead of a hex number due to an Internet Explorer
+   incompatibility.
 	
 Release 20050628
 ----------------
