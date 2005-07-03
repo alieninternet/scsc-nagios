@@ -42,7 +42,7 @@ use Net::SNMP;
 use Getopt::Std;
 
 $script = "check_snmp_symbol_spectrum_t3dsap";
-$script_version = "1.0";
+$script_version = "20050703";
 
 # SNMP options
 $version = "1";
