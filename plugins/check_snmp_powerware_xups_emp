@@ -262,7 +262,9 @@ sub check_device {
 	$returnstr = "Temperature Unavailable";
     }
 
-    if (!($xups_emp_humidity eq "")) {
+    if (($xups_emp_humidity ne "") &&
+	($xups_emp_humidity >= 0) &&
+        ($xups_emp_humidity <= 100)) {
 	# Have we broken a threshold?
 	if ((($critical_humidity_max != -1) &&
 	     ($xups_emp_humidity > $critical_humidity_max)) ||
