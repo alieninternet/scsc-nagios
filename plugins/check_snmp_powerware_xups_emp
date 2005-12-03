@@ -256,7 +256,7 @@ sub check_device {
 	# Add the temperature
 	$returnstr = 
 	    "$returnstr" .
-	    "Temperature: $xups_emp_temp\&#8451;"; # &#x2103;
+	    "Temperature: $xups_emp_temp C"; # &#2451; or &#x2103; ?
     } else {
 	status(2); # Critical
 	$returnstr = "Temperature Unavailable";
