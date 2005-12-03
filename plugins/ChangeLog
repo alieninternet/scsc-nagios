@@ -1,4 +1,8 @@
 
+Release 2005????
+----------------
+ * Added check_snmp_apc_emp
+	
 Release 20050703
 ----------------
  * Cleaned up code comments, labels, help	
