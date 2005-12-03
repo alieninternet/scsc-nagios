@@ -43,7 +43,7 @@ use Net::SNMP;
 use Getopt::Std;
 
 $script = "check_snmp_ups_input";
-$script_version = "20050703";
+$script_version = "20051203";
 
 # SNMP options
 $version = "1";
