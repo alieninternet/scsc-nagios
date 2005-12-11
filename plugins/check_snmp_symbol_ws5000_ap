@@ -45,6 +45,8 @@ use Net::SNMP;
 use Getopt::Std;
 
 $script = "check_snmp_symbol_ws5000_ap";
+$script_title =
+  "Monitor the status of a Symbol Access Point via a Symbol Wireless Switch 5000";
 $script_version = "20051203";
 
 # SNMP options
@@ -370,14 +372,14 @@ sub usage {
 $script ($script_version)
 Copyright (c) 2005 Simon Butcher <simon@butcher.name>
 
-Monitor the status of a Symbol Access Point via a Symbol Wireless Switch 5000
+$script_title
 
 Usage: $script -H <hostname> -A <name> [-C <community>] [-w <#>] [-c <#>]
 
 Options:
     -H 	Hostname or IP address of the WS-5000
     -A  Target access point name
-    -C 	SNMP read community (default is public)
+    -C 	SNMP read community (default is $community)
     -w  Number of associated mobile units to begin warning status (eg. 100)
     -c  Number of associated mobile units to begin critical status (eg. 120)
 

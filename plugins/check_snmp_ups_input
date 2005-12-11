@@ -43,6 +43,9 @@ use Net::SNMP;
 use Getopt::Std;
 
 $script = "check_snmp_ups_input";
+$script_title =
+  "Monitor the status of an RFC1628-compliant UPS via SNMP:\n" .
+  "Input Monitoring";
 $script_version = "20051203";
 
 # SNMP options
@@ -379,16 +382,15 @@ sub usage {
 $script ($script_version)
 Copyright (c) 2005 Simon Butcher <simon@butcher.name>
 
-Monitor the status of an RFC1628-compliant UPS via SNMP:
-Input Monitoring
-
+$script_title
+    
 Usage: $script -H <hostname> [-C <community>] [-i <i>]
        [-w <vmin>,<vmax>,<fmin>,<fmax>]
        [-c <vmin>,<vmax>,<fmin>,<fmax>]
 
 Options:
     -H 	Hostname or IP address of the UPS
-    -C 	SNMP read community (default is public)
+    -C 	SNMP read community (default is $community)
     -i  Input index number (defaults to 1 if not set)
     -w  Warning level input voltage and frequency thresholds
     -c  Critical level input voltage and frequency thresholds

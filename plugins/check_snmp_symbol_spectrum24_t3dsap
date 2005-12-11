@@ -42,6 +42,8 @@ use Net::SNMP;
 use Getopt::Std;
 
 $script = "check_snmp_symbol_spectrum_t3dsap";
+$script_title =
+  "Monitor the status of a Symbol Spectrum24 direct sequence WLAN access point";
 $script_version = "20051203";
 
 # SNMP options
@@ -284,13 +286,13 @@ sub usage {
 $script ($script_version)
 Copyright (c) 2005 Simon Butcher <simon@butcher.name>
 
-Monitor the status of a Symbol Spectrum24 direct sequence WLAN access point
+$script_title
 
 Usage: $script -H <hostname> [-C <community>] [-w <#>] [-c <#>]
 
 Options:
     -H 	Hostname or IP address of the access point
-    -C 	SNMP read community (default is public)
+    -C 	SNMP read community (default is $community)
     -w  Number of associated mobile units to begin warning status (eg. 100)
     -c  Number of associated mobile units to begin critical status (eg. 120)
 

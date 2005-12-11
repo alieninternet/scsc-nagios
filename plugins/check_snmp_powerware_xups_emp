@@ -42,6 +42,8 @@ use Net::SNMP;
 use Getopt::Std;
 
 $script = "check_snmp_powerware_xups_emp";
+$script_title =
+  "Check an PowerWare UPS' EMP device via SNMP";
 $script_version = "20051203";
 
 # SNMP options
@@ -322,14 +324,14 @@ sub usage {
 $script ($script_version)
 Copyright (c) 2005 Simon Butcher <simon@butcher.name>
 
-Check an PowerWare UPS' EMP device via SNMP       
+$script_title
 
 Usage: $script -H <hostname> [-C <community>]
             [-w <temp>,<hMax>,<hMin>] [-c <temp>,<hMax>,<hMin>]
 
 Options:
     -H 	Hostname or IP address of the PowerWare UPS
-    -C 	SNMP read community (default is public)
+    -C 	SNMP read community (default is $community)
     -w  Warning level for temperature max and humidity max/min
     -c  Critical level for temperature max and humidity max/min
         For example: 30 degrees, between 15% and 75% humidity = "30,75,15"

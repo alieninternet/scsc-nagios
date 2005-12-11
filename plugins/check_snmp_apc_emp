@@ -42,6 +42,8 @@ use Net::SNMP;
 use Getopt::Std;
 
 $script = "check_snmp_apc_emp";
+$script_title =
+  "Check an APC Environmental Monitoring Probe via SNMP";
 $script_version = "20051203";
 
 # SNMP options
@@ -397,14 +399,14 @@ sub usage {
 $script ($script_version)
 Copyright (c) 2005 Simon Butcher <simon@butcher.name>
 
-Check an APC Environmental Monitoring Probe via SNMP
+$script_title
 
 Usage: $script -H <hostname> [-C <community>] -P <probe name>
             [-w <temp>,<hMax>,<hMin>] [-c <temp>,<hMax>,<hMin>]
 
 Options:
     -H 	Hostname or IP address of the APC SNMP card
-    -C 	SNMP read community (default is public)
+    -C 	SNMP read community (default is $community)
     -P  The name of the probe you wish to monitor
     -w  Warning level for temperature max and humidity max/min (if available)
     -c  Critical level for temperature max and humidity max/min (if available)

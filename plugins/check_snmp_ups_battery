@@ -44,6 +44,9 @@ use Net::SNMP;
 use Getopt::Std;
 
 $script = "check_snmp_ups_battery";
+$script_title =
+  "Monitor the status of an RFC1628-compliant UPS via SNMP:\n" .
+  "Battery Monitoring";
 $script_version = "20051203";
 
 # SNMP options
@@ -350,14 +353,14 @@ sub usage {
 $script ($script_version)
 Copyright (c) 2005 Simon Butcher <simon@butcher.name>
 
-Monitor the status of an RFC1628-compliant UPS via SNMP:
-Battery Monitoring
+$script_title
 
-Usage: $script -H <hostname> [-C <community>] [-w <%>,<s>] [-c <%>,<s>]
+Usage: $script -H <hostname> [-C <community>]
+       [-w <%>,<s>] [-c <%>,<s>]
 
 Options:
     -H 	Hostname or IP address of the UPS
-    -C 	SNMP read community (default is public)
+    -C 	SNMP read community (default is $community)
     -w  Warning level charge percentage and remaining battery seconds
     -c  Critical level charge percentage and remaining battery seconds
         For example: 75% battery and 5 minutes left: 75,300
