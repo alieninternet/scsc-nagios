@@ -1,7 +1,16 @@
 
+Release 200?????
+----------------
+ * Added a check for peribit network devices
+ * Minor fixes to help text
+
 Release 20051203
 ----------------
  * Added check_snmp_apc_emp
+ * Minor fixes
+ * Changed the degrees-celcius sign of the PowerWave EMP check output to
+   use text-only, due to Nagios stripping out certain characters, and to
+   make it easier to read for non-HTML users (SMS reception, for example)
 	
 Release 20050703
 ----------------
