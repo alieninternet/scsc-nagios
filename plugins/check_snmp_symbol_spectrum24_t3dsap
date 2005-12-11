@@ -270,7 +270,7 @@ sub check_device {
     # Add on some performance monitoring stuff to the return string :)
     $returnstr =
 	"$returnstr" .
-	"|\"$ap_devicetype\";\"$ap_uptime\";$ap_assocmus;\"$ap_location\";" .
+	"|\"$ap_devicetype\";\"$ap_uptime\";$ap_assocmus;\"$ap_location\"" .
 	";\"$ap_ssid\"" .
 	";";
 }
