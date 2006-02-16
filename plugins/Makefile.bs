@@ -1,0 +1,22 @@
+# $Id$
+# Small makefile for developers wishing to bootstrap the package
+#
+
+.PHONY: bootstrap
+
+AUTOCONF_DIR=./config
+AUTOCONF_FILE=./configure.ac
+AUTOCONF_SCRIPT=./configure
+AUTOCONF_HEADER=./include/autoconf.h.in
+LIBOPTS_DIR=libopts
+
+bootstrap:
+	rm -rf $(LIBOPTS_DIR) libopts-*
+	tar zxvf `autoopts-config libsrc`
+	mv -f libopts-*.*.* $(LIBOPTS_DIR)
+	mv -f $(LIBOPTS_DIR)/libopts.m4 $(AUTOCONF_DIR)/.
+	aclocal -I $(AUTOCONF_DIR)
+	autoheader $(AUTOCONF_FILE) > $(AUTOCONF_HEADER)
+	automake --add-missing --copy --include-deps --foreign
+	autoconf -I $(AUTOCONF_DIR) -o $(AUTOCONF_SCRIPT) $(AUTOCONF_FILE)
+	-chmod 755 $(AUTOCONF_SCRIPT)
