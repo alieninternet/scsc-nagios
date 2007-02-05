@@ -45,7 +45,7 @@ use Getopt::Std;
 
 $script = "check_snmp_symbol_ws5000_v3_ap";
 $script_title =
-  "Monitor the status of a Symbol Access Port via a Symbol Wireless Switch 5000 (v3)";
+  "Check the status of a Symbol Access Port via a Symbol Wireless Switch 5000 (v3)";
 $script_version = "20070205";
 
 # SNMP options
