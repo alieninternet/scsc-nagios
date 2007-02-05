@@ -1,7 +1,7 @@
 
-Release 200?????
+Release 20070205
 ----------------
- * Added a check for peribit network devices
+ * Adding support for version 3.0 wireless switch devices from Symbol/Motorola
  * Minor fixes/modifications to help texts
 
 Release 20051203

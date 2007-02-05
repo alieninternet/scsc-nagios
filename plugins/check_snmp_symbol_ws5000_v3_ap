@@ -1,0 +1,406 @@
+#! /usr/bin/perl
+###############################################################################
+#                                                                             #
+#  Check a Symbol Access Point connected to a Wireless Switch 5xxx via SNMP   #
+#                                                                             #
+###############################################################################
+#
+# Copyright (c) 2007 Simon Butcher <simon@butcher.name>
+#  
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA    02111-1307    USA
+#
+##############################################################################
+#
+#
+# Performance data:
+#    +-------+-----------------------------------------------+
+#    | Field | Description                                   |
+#    +-------+-----------------------------------------------+
+#    |   1   | Radio Type ("a", "b", "g", "fh", etc)         |
+#    |   2   | Device Type ("AP100", "AP300", etc)           |
+#    |   3   | Uptime                                        |
+#    |   4   | Associated MUs (Mobile Units)                 |
+#    |   5   | Current channel number                        |
+#    |   6   | Current power level (in dBm)                  |
+#    |   7   | Current power level (in Mw)                   |
+#    +-------+-----------------------------------------------+
+#
+##############################################################################
+
+
+use Net::SNMP;
+use Getopt::Std;
+
+$script = "check_snmp_symbol_ws5000_v3_ap";
+$script_title =
+  "Monitor the status of a Symbol Access Port via a Symbol Wireless Switch 5000 (v3)";
+$script_version = "20070205";
+
+# SNMP options
+$version = "1";
+$timeout = 2;
+
+# The index number of the Access Port _radio_ we want
+$target_index = 0;
+                        
+# Various SNMP OID prefixes to look at..
+$oid_ap_name            = ".1.3.6.1.4.1.388.14.3.2.1.11.5.1.3.";
+$oid_ap_onlinestatus    = ".1.3.6.1.4.1.388.14.3.2.1.11.11.1.2.";
+$oid_ap_radiotype       = ".1.3.6.1.4.1.388.14.3.2.1.11.5.1.4.";
+$oid_ap_devicetype      = ".1.3.6.1.4.1.388.14.3.2.1.11.5.1.5.";
+$oid_ap_uptime          = ".1.3.6.1.4.1.388.14.3.2.1.11.11.1.10.";
+$oid_ap_assocmus        = ".1.3.6.1.4.1.388.14.3.2.1.11.11.1.9.";
+$oid_ap_currentchannel  = ".1.3.6.1.4.1.388.14.3.2.1.11.11.1.6.";
+$oid_ap_currentpower_db = ".1.3.6.1.4.1.388.14.3.2.1.11.11.1.7."; # in dBm
+$oid_ap_currentpower_mw = ".1.3.6.1.4.1.388.14.3.2.1.11.11.1.8."; # in Mw
+
+# The information we returned
+$ap_description = "";
+$ap_radiotype = "";
+$ap_devicetype = "";
+$ap_uptime = "";
+$ap_assocmus = "";
+$ap_currentchannel = "";
+$ap_currentpower_db = "";
+$ap_currentpower_mw = "";
+
+# Our return status - we start with 0 (OK) and hope for the best
+$status = 0;
+
+# Our return string with lots of interesting stuff in it
+$returnstr = "";
+
+# The SNMP hostname and community to use for the query
+$hostname = "";
+$community = "public";
+
+
+# Grab the command line options
+getopts("h:H:C:A:w:c:");
+
+# If we didn't get any options, show some help and quit
+if ($opt_h){
+    usage();
+    exit(-1); # Unknown
+}
+
+# Get the hostname, if it was given..
+if (defined($opt_H)){
+    $hostname = $opt_H;
+} else {
+    # We really need a hostname
+    usage();
+    exit(-1); # Unknown
+}
+
+# Get the SNMP community
+if (defined($opt_C)){
+    $community = $opt_C;
+}
+
+# Get the access point name
+if (defined($opt_A)){
+    $target_ap_name = $opt_A;
+} else {
+    # We also really need an access point name
+    usage();
+    exit(-1); # Unknown
+}
+
+# Grab the warning and critical MU association levels, if provided
+if (defined($opt_w)) {
+    $mu_warning = $opt_w;
+
+    # Make sure this is a number, and a valid one at that..
+    if ($mu_warning <= 0) {
+	print "Warning level must be a number of mobile units.\n";
+	exit(-1); # Unknown
+    }
+} else {
+    $mu_warning = -1;
+}
+if (defined($opt_c)) {
+    $mu_critical = $opt_c;
+
+    # Make sure this is a number, and a valid one at that..
+    if ($mu_critical <= 0) {
+	print "Critical level must be a number of mobile units.\n";
+	exit(-1); # Unknown
+    }
+} else {
+    $mu_critical = -1;
+}
+
+# If both the critical and warning levels were given, check warning is lower..
+if (($mu_warning >= 0) && ($mu_critical >= 0) &&
+    ($mu_warning > $mu_critical)) {
+    print "Warning level is greater than the critical level!\n";
+    exit(-1); # Unknown
+}
+
+# Initialise the SNMP session via the Net::SNMP perl module
+my ($snmp_session, $snmp_error) = Net::SNMP->session(
+    -community => $community,
+    -hostname => $hostname,
+    -version => $version,
+    -timeout => $timeout,
+);
+
+# Try to find an access point
+find_apoint();
+
+# If we found an access point, look further, otherwise complain
+if ($target_index > 0){
+    check_device();
+} else {
+    status(2); # Critical
+    print "Access point not found\n";
+    exit($status);
+}
+    
+# Shut down the SNMP session
+$snmp_session->close();
+
+# Return the return string and return status
+print "$returnstr\n";
+exit($status);
+
+
+##############################################################################
+##############################################################################
+#
+# Change the status level
+#
+sub status {
+    my $newstatus = $_[0];
+
+    # If the new status is greater than the old status, change the old status
+    if ($newstatus > $status) {
+	$status = $newstatus;
+    }
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Find an access point
+#
+sub find_apoint {
+    my $index = 1;
+
+    # Loop over the access point index number to count the access point
+    while (1) {
+	# Work out this SNMP OID
+        $oid = $oid_ap_name . $index;
+
+	# Is there an AP at this index? Try to get its name
+	if (!defined($snmp_session->get_request($oid))) {
+	    # We ran out of AP's to check, break..
+	    print "WARNING: SNMP error or Access Point not found\n";
+	    exit(1); # Warning
+	}
+
+	# Okay, so the OID works, grab the name we received
+        foreach ($snmp_session->var_bind_names()) {
+            $this_apoint_name = $snmp_session->var_bind_list()->{$_};
+        }
+
+	# Compare the names, if they're equal, set the index and break
+        if (lc($this_apoint_name) eq lc($target_ap_name)) {
+            $target_index = $index;
+	    return;
+        }
+
+	# Increase the index.. keep searching..
+	$index++;
+    }
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Grab a value from snmp
+#
+sub grab_snmp_value {
+    my $this_oid_prefix = $_[0];
+    my $this_value = "";
+
+    # Tack the index on to the end of the given OID
+    my $this_oid = $this_oid_prefix . $target_index;  
+
+    # Try to grab the OID's value, if it exists
+    if (defined($snmp_session->get_request($this_oid))) {
+        foreach ($snmp_session->var_bind_names()) {
+            $this_value = $snmp_session->var_bind_list()->{$_};
+        }
+    }
+
+    # Return the value we got..
+    return $this_value;
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Grab lots of interesting info about the access point :)
+#
+sub check_device {
+    # Grab some values
+    $ap_onlinestatus = grab_snmp_value($oid_ap_onlinestatus);
+    $ap_description = grab_snmp_value($oid_ap_description);
+    $ap_location = grab_snmp_value($oid_ap_location);
+    $ap_radiotype = lc(grab_snmp_value($oid_ap_radiotype));
+    $ap_devicetype = grab_snmp_value($oid_ap_devicetype);
+    $ap_uptime = grab_snmp_value($oid_ap_uptime);
+    $ap_assocmus = grab_snmp_value($oid_ap_assocmus);
+    $ap_currentchannel = grab_snmp_value($oid_ap_currentchannel);
+    $ap_currentpower_db = grab_snmp_value($oid_ap_currentpower_db);
+    $ap_currentpower_mw = grab_snmp_value($oid_ap_currentpower_mw);
+
+    # Fix the radio type..
+    if ($ap_radiotype == 1) {
+	$ap_radiotype = "a";
+    } elsif ($ap_radiotype == 2) {
+	$ap_radiotype = "b";
+    } elsif ($ap_radiotype == 3) {
+	$ap_radiotype = "g";
+    } elsif ($ap_radiotype == 4) {
+	$ap_radiotype = "fh";
+    }
+    
+    # Fix the device type..
+    if ($ap_devicetype == 1) {
+	$ap_devicetype = "AP100";
+    } elsif ($ap_devicetype == 2) {
+	$ap_devicetype = "AP200";
+    } elsif ($ap_devicetype == 3) {
+	$ap_devicetype = "AP300";
+    } elsif ($ap_devicetype == 4) {
+	$ap_devicetype = "AP4131";
+    }
+    
+    # If we have the device type name, start with that, other use "AP"
+    if ($ap_devicetype eq "") {
+	$returnstr = "AP";
+    } else {
+        $returnstr = "$ap_devicetype";
+    }
+
+    # Work out the online status
+    if ($ap_onlinestatus == 1) {        # Unadopted
+	status(1); # Warning
+	$returnstr = "$returnstr Unadopted";
+    } elsif ($ap_onlinestatus == 2) {   # Normal
+	status(0); # OK
+	$returnstr = "$returnstr Normal";
+    } elsif ($ap_onlinestatus == 3) {   # Detector
+	status(0); # OK
+	$returnstr = "$returnstr Detector";
+    } elsif ($ap_onlinestatus == 4) {   # Self healing
+	status(1); # Warning
+	$returnstr = "$returnstr Self healing";
+    } else {                            # Unknown!
+	status(3); # NFI
+	$returnstr = "$returnstr UNKNOWN";
+    }
+
+    # If we have the access point type, add that..
+    if (!($ap_radiotype eq "")) {
+	$returnstr = "$returnstr (802.11$ap_radiotype)";
+    }
+
+    # If we have the MU count, add that
+    if ($ap_assocmus >= 0) {
+	# Add a comma to the return string
+	$returnstr = "$returnstr,";
+
+	# If we have a critical or warning level to watch, check it now..
+	if (($mu_critical >= 0) &&
+	    ($ap_assocmus >= $mu_critical)) {
+	    # Prefix a critical label to the MU count and change the status
+	    status(2); # Critical
+	    $returnstr = "$returnstr CRITICAL:";
+	    $mu_is_critical = 1;
+	} else {
+	    $mu_is_critical = 0;
+	}
+
+	# If we have a warning level to watch, check it too..
+	if (($mu_warning >= 0) &&
+	    ($mu_is_critical != 1) &&
+            ($ap_assocmus >= $mu_warning)) {
+	    status(1); # Warning
+	    $returnstr = "$returnstr WARNING: <$mu_warning>";
+	}
+
+	# Add the MU count
+	$returnstr = 
+	    "$returnstr " .
+	    "$ap_assocmus MUs";
+    }
+
+    # If we have channel/power information, add that too
+    if (!($ap_currentchannel eq "") &&
+        !($ap_currentpower_db eq "") &&
+        !($ap_currentpower_mw eq "")) {
+	$returnstr =
+	    "$returnstr, " .
+	    "Channel ${ap_currentchannel}\@${ap_currentpower_db} dBm " .
+	    "(${ap_currentpower_mw} Mw)";
+    }
+
+    # If we have the uptime, add that
+    if (!($ap_uptime eq "")) {
+	$returnstr =
+	    "$returnstr, " .
+	    "Uptime: $ap_uptime";
+    }
+
+    # Add on some performance monitoring stuff to the return string :)
+    $returnstr =
+	"$returnstr" .
+	"|\"$ap_radiotype\";\"$ap_devicetype\";\"$ap_uptime\";$ap_assocmus" .
+	";$ap_currentchannel;$ap_currentpower_db;$ap_currentpower_mw" .
+	";";
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Usage information
+#
+sub usage {
+    print << "USAGE";
+$script ($script_version)
+Copyright (c) 2005 Simon Butcher <simon@butcher.name>
+
+$script_title
+
+Usage: $script -H <hostname> -A <name> [-C <community>] [-w <#>] [-c <#>]
+
+Options:
+    -H 	Hostname or IP address of the WS-5000
+    -A  Target access point name
+    -C 	SNMP read community (default is $community)
+    -w  Number of associated mobile units to begin warning status (eg. 100)
+    -c  Number of associated mobile units to begin critical status (eg. 120)
+
+USAGE
+     exit(-1); # Unknown
+}
