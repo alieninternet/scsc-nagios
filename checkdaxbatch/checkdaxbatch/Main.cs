@@ -39,7 +39,7 @@ namespace SCSCNagios.CheckDaxBatch
         /*
          * Executable entry point (console)
          */
-        static int Main(string[] args)
+        static void Main(string[] args)
         {
             string className = null;
             string company = null;
@@ -52,7 +52,8 @@ namespace SCSCNagios.CheckDaxBatch
             // We need at least one argument..
             if (args.Length < 3) {
                 printUsage();
-                return -1;
+                Environment.ExitCode = -1;
+                return;
             }
 
             // Try and grab arguments..
@@ -62,7 +63,8 @@ namespace SCSCNagios.CheckDaxBatch
                 criticalSecs = Convert.ToInt64((string)args[2]);
             } catch (FormatException) {
                 Console.WriteLine("Warning and Critical values must be numbers. Run with no parameters for help.");
-                return -1;
+                Environment.Exit(-1);
+                return;
             }
 
             // Make sure the numbers are OK
@@ -70,7 +72,8 @@ namespace SCSCNagios.CheckDaxBatch
                 (criticalSecs != 0) &&
                 (criticalSecs <= warningSecs)) {
                 Console.WriteLine("Critical threshold must be longer than the warning threshold.");
-                return -1;
+                Environment.Exit(-1);
+                return;
             }
 
             // Create our batch checker..
@@ -88,7 +91,7 @@ namespace SCSCNagios.CheckDaxBatch
             Console.WriteLine(checker.getNagiosMessage());
 
             // Return the result (status level)..
-            return (int)checker.getNagiosStatus();
+            Environment.Exit((int)checker.getNagiosStatus());
         }
     }
 }

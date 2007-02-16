@@ -8,7 +8,7 @@
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>SCSCNagios.CheckDaxBatch</RootNamespace>
-    <AssemblyName>SCSCNagios.CheckDaxBatch</AssemblyName>
+    <AssemblyName>checkdaxbatch</AssemblyName>
     <SignManifests>false</SignManifests>
     <SignAssembly>false</SignAssembly>
     <PublishUrl>c:\checkdaxbatch\</PublishUrl>
