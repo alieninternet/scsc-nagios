@@ -31,7 +31,7 @@ namespace SCSCNagios.CheckDaxBatch
          */
         static void printUsage()
         {
-            Console.WriteLine("checkdaxbatch (20070216)\n");
+            Console.WriteLine("checkdaxbatch (20070217)\n");
             Console.WriteLine(Resources.ResourceManager.GetString("Usage"));
         }
 
