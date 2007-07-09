@@ -210,6 +210,8 @@ sub check_device {
 	    		$oid_rbtsh_status .
 	    		$oid_rbtsh_status_serviceenum);
 
+
+    
     # Check the health...
     if ($rbtsh_status_healthenum == 50000) { # Critical
 	status(2); # Critical
@@ -226,13 +228,19 @@ sub check_device {
     }
     
     # Build the return string
-    $returnstr = 
-        ("Steelhead " . 
-	 $rbtsh_system_model . 
-	 ": " .
-	 $rbtsh_status_healthstr .
-	 ", optimisation service: " .
-	 $rbtsh_status_servicestr);
+    if ($rbtsh_system_model == "") {
+	$returnstr =
+	  "No information returned from SNMP";
+	status(2); # Critical
+    } else {
+	$returnstr = 
+	    ("Steelhead " . 
+	     $rbtsh_system_model . 
+	     ": " .
+	     $rbtsh_status_healthstr .
+	     ", optimisation service: " .
+	     $rbtsh_status_servicestr);
+    }
     
     # Add on some performance monitoring stuff to the return string :)
     $returnstr =
