@@ -40,7 +40,7 @@
 use Net::SNMP;
 use Getopt::Std;
 
-$script = "check_snmp_apc_emp";
+$script = "check_snmp_riverbed_steelhead_peer";
 $script_title =
   "Find and check a peer connect to a Riverbed Steelhead appliance";
 $script_version = "20070709";
