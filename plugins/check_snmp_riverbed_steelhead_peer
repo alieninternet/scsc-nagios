@@ -1,0 +1,261 @@
+#! /usr/bin/perl
+###############################################################################
+#                                                                             #
+#       Find and check a peer connect to a Riverbed Steelhead appliance       #
+#                                                                             #
+###############################################################################
+#
+# Copyright (c) 2007 Simon Butcher <simon@butcher.name>
+#  
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA    02111-1307    USA
+#
+##############################################################################
+#
+#
+# Performance data:
+#    +-------+-----------------------------------------------+
+#    | Field | Description                                   |
+#    +-------+-----------------------------------------------+
+#    |   1   | Peer's hostname				     |
+#    |   2   | Peer's IP				     |
+#    |   3   | Peer's version				     |
+#    |   4   | Peer's model				     |
+#    +-------+-----------------------------------------------+
+#
+##############################################################################
+
+
+use Net::SNMP;
+use Getopt::Std;
+
+$script = "check_snmp_apc_emp";
+$script_title =
+  "Find and check a peer connect to a Riverbed Steelhead appliance";
+$script_version = "20070709";
+
+# SNMP options
+$version = "1";
+$timeout = 2;
+
+# Various SNMP OID prefixes to look at..
+$oid_rbtsh		= ".1.3.6.1.4.1.17163.1.1"; # Steelhead
+$oid_rbtsh_status_peers	= ".2.6.1.1"; # Peer status table
+$oid_peer_index		= ".1."; # Peer table: Index
+$oid_peer_hostname	= ".2."; # Peer table: Hostname
+$oid_peer_version	= ".3."; # Peer table: Version
+$oid_peer_ip		= ".4."; # Peer table: IP
+$oid_peer_model		= ".5."; # Peer table: Model
+
+# The OID prefix for the bit of the table for the peer we found
+$peer_table_oid = "";
+$peer_table_index = "";
+
+# Our return status - we start with 0 (OK) and hope for the best
+$status = 0;
+
+# Our return string with lots of interesting stuff in it
+$returnstr = "";
+
+# The SNMP hostname and community to use for the query
+$hostname = "";
+$community = "public";
+
+
+# Grab the command line options
+getopts("h:H:C:I:");
+
+# If we didn't get any options, show some help and quit
+if ($opt_h) {
+    usage();
+    exit(-1); # Unknown
+}
+
+# Get the hostname, if it was given..
+if (defined($opt_H)) {
+    $hostname = $opt_H;
+} else {
+    # We really need a hostname
+    usage();
+    exit(-1); # Unknown
+}
+
+# Get the SNMP community
+if (defined($opt_C)) {
+    $community = $opt_C;
+}
+
+# Grab the IP..
+if (defined($opt_I)) {
+    $peer_ip = $opt_I;
+} else {
+    # We need an IP, otherwise who are we looking for??
+    usage();
+    exit(-1); # Unknown
+}
+
+
+# Initialise the SNMP session via the Net::SNMP perl module
+my ($snmp_session, $snmp_error) = Net::SNMP->session(
+    -community => $community,
+    -hostname => $hostname,
+    -version => $version,
+    -timeout => $timeout,
+);
+
+# Grab interesting details
+check_device();
+    
+# Shut down the SNMP session
+$snmp_session->close();
+
+# Return the return string and return status
+print "$returnstr\n";
+exit($status);
+
+
+##############################################################################
+##############################################################################
+#
+# Change the status level
+#
+sub status {
+    my $newstatus = $_[0];
+
+    # If the new status is greater than the old status, change the old status
+    if ($newstatus > $status) {
+	$status = $newstatus;
+    }
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Grab a value from snmp
+#
+sub grab_snmp_value {
+    my $this_oid = $_[0];
+    my $this_value = "";
+
+    # Try to grab the OID's value, if it exists
+    if (defined($snmp_session->get_request($this_oid))) {
+        foreach ($snmp_session->var_bind_names()) {
+            $this_value = $snmp_session->var_bind_list()->{$_};
+        }
+    }
+
+    # Return the value we got..
+    return $this_value;
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Find the base OID for the status table
+#
+sub find_peer {
+    my $index = 1;
+    
+    # Loop over the peer index number to find the peer we're looking for..
+    while (1) {
+	# Work out this SNMP OID
+	$oid = $oid_rbtsh . $oid_rbtsh_status_peers . $oid_peer_ip . $index;
+
+	# Is there a peer at this index?
+	if (!defined($snmp_session->get_request($oid))) {
+	    # Ran out of index points, it's not connected
+	    print "Peer " . $peer_ip . " not connected or not found!\n";
+	    exit(2); # Critical
+	}
+	
+	# The OID is valid, grab the name we received
+	foreach ($snmp_session->var_bind_names()) {
+	    $this_peer_ip = $snmp_session->var_bind_list()->{$_};
+	}
+	
+	# Is this the IP?
+	if ($this_peer_ip eq $peer_ip) {
+	    # Found it!
+	    $target_index = $index;
+	    return;
+	}
+	
+	# Keep searching: go to the next index
+	$index++;
+    }
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Grab lots of interesting info from the probe
+#
+sub check_device {
+    # Find the probe's location in the table, including its index..
+    find_peer();
+
+    # Grab some values..
+    $peer_hostname =
+        grab_snmp_value($oid_rbtsh . $oid_rbtsh_status_peers .
+	                $oid_peer_hostname . $target_index);
+    $peer_version = 
+        grab_snmp_value($oid_rbtsh . $oid_rbtsh_status_peers .
+	                $oid_peer_version . $target_index);
+    $peer_model =
+        grab_snmp_value($oid_rbtsh . $oid_rbtsh_status_peers .
+	                $oid_peer_model . $target_index);
+    
+    # Build the return string..
+    $returnstr =
+        "Peer " . $peer_hostname .
+        " (" . $peer_ip .
+        ") connected; Steelhead " . $peer_model . 
+        " version " . $peer_version;
+
+    # Add on some performance monitoring stuff to the return string :)
+    $returnstr =
+	"$returnstr" .
+        "|$peer_hostname;$peer_ip;$peer_version;$peer_model" .
+	";";
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Usage information
+#
+sub usage {
+    print << "USAGE";
+$script ($script_version)
+Copyright (c) 2007 Simon Butcher <simon@butcher.name>
+
+$script_title
+
+Usage: $script -H <hostname> [-C <community>] -I <peer IP>
+
+Options:
+    -H 	Hostname or IP address of the APC SNMP card
+    -C 	SNMP read community (default is $community)
+    -I  The IP address of the peer to be found
+      
+Note: Some Steelhead versions reverse the IP address erroneously, so
+      expect the need to reverse byte order of the IP. For example,
+      10.100.225.110 becomes 110.225.100.10.
+USAGE
+     exit(-1); # Unknown
+}
