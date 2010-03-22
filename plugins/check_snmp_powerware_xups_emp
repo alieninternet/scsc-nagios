@@ -5,7 +5,7 @@
 #                                                                             #
 ###############################################################################
 #
-# Copyright (c) 2005 Simon Butcher <simon@butcher.name>
+# Copyright (c) 2005,2010 Simon Butcher <simon@butcher.name>
 #  
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -37,61 +37,61 @@
 #
 ##############################################################################
 
-
+use strict;
 use Net::SNMP;
 use Getopt::Std;
 
-$script = "check_snmp_powerware_xups_emp";
-$script_title =
+my $script = "check_snmp_powerware_xups_emp";
+my $script_title =
   "Check an PowerWare UPS' EMP device via SNMP";
-$script_version = "20051203";
+my $script_version = "20100322";
 
 # SNMP options
-$version = "1";
-$timeout = 2;
+my $version = "1";
+my $timeout = 2;
 
 # Various SNMP OID prefixes to look at..
-$oid_xups_emp_temp      = ".1.3.6.1.4.1.534.1.6.5"; # degrees celcius
-$oid_xups_emp_humidity  = ".1.3.6.1.4.1.534.1.6.6"; # percent
-$oid_xups_emp_contacts  = ".1.3.6.1.4.1.534.1.6.7"; # number of contacts
-$oid_xups_emp_conttable = ".1.3.6.1.4.1.534.1.6.8.1.3."; # contacts
+my $oid_xups_emp_temp      = ".1.3.6.1.4.1.534.1.6.5"; # degrees celcius
+my $oid_xups_emp_humidity  = ".1.3.6.1.4.1.534.1.6.6"; # percent
+my $oid_xups_emp_contacts  = ".1.3.6.1.4.1.534.1.6.7"; # number of contacts
+my $oid_xups_emp_conttable = ".1.3.6.1.4.1.534.1.6.8.1.3."; # contacts
 
 # The information we returned
-$xups_emp_temp = 0;
-$xups_emp_humidity = 0;
-$xups_emp_contacts = 0;
+my $xups_emp_temp = 0;
+my $xups_emp_humidity = 0;
+my $xups_emp_contacts = 0;
 
 # Thresholds
-$critical_temp = -1;
-$warning_temp = -1;
-$critical_humidity_max = -1;
-$warning_humidity_max = -1;
-$critical_humidity_min = -1;
-$warning_humidity_min = -1;
+my $critical_temp = -1;
+my $warning_temp = -1;
+my $critical_humidity_max = -1;
+my $warning_humidity_max = -1;
+my $critical_humidity_min = -1;
+my $warning_humidity_min = -1;
 
 # Our return status - we start with 0 (OK) and hope for the best
-$status = 0;
+my $status = 0;
 
 # Our return string with lots of interesting stuff in it
-$returnstr = "";
+my $returnstr = "";
 
 # The SNMP hostname and community to use for the query
-$hostname = "";
-$community = "public";
+my $hostname = "";
+my $community = "public";
 
 
 # Grab the command line options
 getopts("h:H:C:w:c:");
 
 # If we didn't get any options, show some help and quit
-if ($opt_h){
+if ($Getopt::Std::opt_h){
     usage();
     exit(-1); # Unknown
 }
 
 # Get the hostname, if it was given..
-if (defined($opt_H)){
-    $hostname = $opt_H;
+if (defined($Getopt::Std::opt_H)){
+    $hostname = $Getopt::Std::opt_H;
 } else {
     # We really need a hostname
     usage();
@@ -99,13 +99,13 @@ if (defined($opt_H)){
 }
 
 # Get the SNMP community
-if (defined($opt_C)){
-    $community = $opt_C;
+if (defined($Getopt::Std::opt_C)){
+    $community = $Getopt::Std::opt_C;
 }
 
 # Grab the warning thresholds
-if (defined($opt_w)) {
-    my @warning = split(/\,/, $opt_w);
+if (defined($Getopt::Std::opt_w)) {
+    my @warning = split(/\,/, $Getopt::Std::opt_w);
 
     if (!($warning[0] eq "")) {
         $warning_temp = $warning[0];
@@ -127,8 +127,8 @@ if (defined($opt_w)) {
 }
 
 # Grab the critical thresholds
-if (defined($opt_c)) {
-    my @critical = split(/\,/, $opt_c);
+if (defined($Getopt::Std::opt_c)) {
+    my @critical = split(/\,/, $Getopt::Std::opt_c);
 
     if (!($critical[0] eq "")) {
         $critical_temp = $critical[0];
@@ -237,6 +237,8 @@ sub grab_snmp_value {
 # Grab lots of interesting info about the device
 #
 sub check_device {
+    my $boolvalue;
+    
     # Grab some values
     $xups_emp_temp = grab_snmp_value($oid_xups_emp_temp);
     $xups_emp_humidity = grab_snmp_value($oid_xups_emp_humidity);
@@ -248,16 +250,16 @@ sub check_device {
 	if (($critical_temp != -1) &&
 	    ($xups_emp_temp >= $critical_temp)) {
 	    status(2); # Critical
-	    $returnstr = "Critical: ";
+	    $returnstr = "*CRITICAL*";
 	} elsif (($warning_temp != -1) &&
 		 ($xups_emp_temp >= $warning_temp)) {
 	    status(1); # Warning
-	    $returnstr = "Warning: ";
+	    $returnstr = "*WARNING*";
 	}
 
 	# Add the temperature
 	$returnstr = 
-	    "$returnstr" .
+	    "$returnstr " .
 	    "Temperature: $xups_emp_temp C"; # &#2451; or &#x2103; ?
     } else {
 	status(2); # Critical
@@ -273,13 +275,13 @@ sub check_device {
 	    (($critical_humidity_min != -1) &&
 	     ($xups_emp_humidity < $critical_humidity_min))) {
 	    status(2); # Critical
-	    $returnstr = "$returnstr, Critical:";
+	    $returnstr = "$returnstr, *CRITICAL*";
 	} elsif ((($warning_humidity_max != -1) &&
 		  ($xups_emp_humidity > $warning_humidity_max)) ||
 		 (($warning_humidity_min != -1) &&
 		  ($xups_emp_humidity < $warning_humidity_min))) {
 	    status(1); # Warning
-	    $returnstr = "$returnstr, Warning:";
+	    $returnstr = "$returnstr, *WARNING*";
 	} else {
 	    $returnstr = "$returnstr,";
 	}
@@ -292,8 +294,8 @@ sub check_device {
     # Add on some performance monitoring stuff to the return string :)
     $returnstr =
 	"$returnstr" .
-	"|$xups_emp_temp;$xups_emp_humidity" .
-	";";
+	"|temperature=$xups_emp_temp, " .
+        "humidity=$xups_emp_humidity";
 
     # Iterate over the contacts and output their values
     for (my $c = 1; $c <= $xups_emp_contacts; $c++) {
@@ -309,7 +311,7 @@ sub check_device {
 
 	$returnstr =
 	    "$returnstr" .
-	    "$boolvalue;";
+	    ", boolvalue=$boolvalue";
     }    
 }
 
@@ -322,7 +324,7 @@ sub check_device {
 sub usage {
     print << "USAGE";
 $script ($script_version)
-Copyright (c) 2005 Simon Butcher <simon@butcher.name>
+Copyright (c) 2005,2010 Simon Butcher <simon\@butcher.name>
 
 $script_title
 

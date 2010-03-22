@@ -6,7 +6,7 @@
 #                                                                             #
 ###############################################################################
 #
-# Copyright (c) 2005 Simon Butcher <simon@butcher.name>
+# Copyright (c) 2005,2010 Simon Butcher <simon@butcher.name>
 #  
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -39,68 +39,68 @@
 #
 ##############################################################################
 
-
+use strict;
 use Net::SNMP;
 use Getopt::Std;
 
-$script = "check_snmp_ups_battery";
-$script_title =
+my $script = "check_snmp_ups_battery";
+my $script_title =
   "Monitor the status of an RFC1628-compliant UPS via SNMP:\n" .
   "Battery Monitoring";
-$script_version = "20051203";
+my $script_version = "20100322";
 
 # SNMP options
-$version = "1";
-$timeout = 2;
+my $version = "1";
+my $timeout = 2;
 
 # Various SNMP OID prefixes to look at..
-$oid_ups_batt_status    = ".1.3.6.1.2.1.33.1.2.1";
+my $oid_ups_batt_status    = ".1.3.6.1.2.1.33.1.2.1";
         # 1 = unknown, 2 = normal, 3 = low, 4 = dead
-$oid_ups_batt_timeleft  = ".1.3.6.1.2.1.33.1.2.2"; # seconds, 0 = AC on-line
-$oid_ups_batt_esttime   = ".1.3.6.1.2.1.33.1.2.3"; # minutes
-$oid_ups_batt_charge    = ".1.3.6.1.2.1.33.1.2.4"; # percent
-$oid_ups_batt_voltage   = ".1.3.6.1.2.1.33.1.2.5"; # / 0.1 volts DC
-$oid_ups_batt_current   = ".1.3.6.1.2.1.33.1.2.6"; # / 0.1 amps DC
-$oid_ups_batt_temp      = ".1.3.6.1.2.1.33.1.2.7"; # degrees celcius
+my $oid_ups_batt_timeleft  = ".1.3.6.1.2.1.33.1.2.2"; # seconds, 0 = AC on-line
+my $oid_ups_batt_esttime   = ".1.3.6.1.2.1.33.1.2.3"; # minutes
+my $oid_ups_batt_charge    = ".1.3.6.1.2.1.33.1.2.4"; # percent
+my $oid_ups_batt_voltage   = ".1.3.6.1.2.1.33.1.2.5"; # / 0.1 volts DC
+my $oid_ups_batt_current   = ".1.3.6.1.2.1.33.1.2.6"; # / 0.1 amps DC
+my $oid_ups_batt_temp      = ".1.3.6.1.2.1.33.1.2.7"; # degrees celcius
 
 # The information we returned
-$ups_batt_status = 0;
-$ups_batt_timeleft = 0;
-$ups_batt_esttime = 0;
-$ups_batt_charge = 0;
-$ups_batt_voltage = 0;
-$ups_batt_current = 0;
-$ups_batt_temp = 0;
+my $ups_batt_status = 0;
+my $ups_batt_timeleft = 0;
+my $ups_batt_esttime = 0;
+my $ups_batt_charge = 0;
+my $ups_batt_voltage = 0;
+my $ups_batt_current = 0;
+my $ups_batt_temp = 0;
 
 # Thresholds
-$critical_charge = -1;
-$warning_charge = -1;
-$critical_timeleft = -1;
-$warning_timeleft = -1;
+my $critical_charge = -1;
+my $warning_charge = -1;
+my $critical_timeleft = -1;
+my $warning_timeleft = -1;
 
 # Our return status - we start with 0 (OK) and hope for the best
-$status = 0;
+my $status = 0;
 
 # Our return string with lots of interesting stuff in it
-$returnstr = "";
+my $returnstr = "";
 
 # The SNMP hostname and community to use for the query
-$hostname = "";
-$community = "public";
+my $hostname = "";
+my $community = "public";
 
 
 # Grab the command line options
 getopts("h:H:C:w:c:");
 
 # If we didn't get any options, show some help and quit
-if ($opt_h){
+if ($Getopt::Std::opt_h){
     usage();
     exit(-1); # Unknown
 }
 
 # Get the hostname, if it was given..
-if (defined($opt_H)){
-    $hostname = $opt_H;
+if (defined($Getopt::Std::opt_H)){
+    $hostname = $Getopt::Std::opt_H;
 } else {
     # We really need a hostname
     usage();
@@ -108,13 +108,13 @@ if (defined($opt_H)){
 }
 
 # Get the SNMP community
-if (defined($opt_C)){
-    $community = $opt_C;
+if (defined($Getopt::Std::opt_C)){
+    $community = $Getopt::Std::opt_C;
 }
 
 # Grab the warning thresholds
-if (defined($opt_w)) {
-    my @warning = split(/\,/, $opt_w);
+if (defined($Getopt::Std::opt_w)) {
+    my @warning = split(/\,/, $Getopt::Std::opt_w);
 
     if (!($warning[0] eq "")) {
 	$warning_charge = $warning[0];
@@ -138,8 +138,8 @@ if (defined($opt_w)) {
 }
 
 # Grab the critical thresholds
-if (defined($opt_c)) {
-    my @critical = split(/\,/, $opt_c);
+if (defined($Getopt::Std::opt_c)) {
+    my @critical = split(/\,/, $Getopt::Std::opt_c);
 
     if (!($critical[0] eq "")) {
 	$critical_charge = $critical[0];
@@ -337,9 +337,12 @@ sub check_device {
     # Add on some performance monitoring stuff to the return string :)
     $returnstr =
 	"$returnstr" .
-	"|$ups_batt_timeleft;$ups_batt_esttime;$ups_batt_charge" .
-	";$ups_batt_voltage;$ups_batt_current;$ups_batt_temp" .
-	";";
+	"|timeleft=$ups_batt_timeleft, " .
+        "esttime=$ups_batt_esttime, " .
+        "charge=$ups_batt_charge, " .
+	"voltage=$ups_batt_voltage, " .
+        "current=$ups_batt_current, " .
+        "temp=$ups_batt_temp";
 }
 
 
@@ -351,7 +354,7 @@ sub check_device {
 sub usage {
     print << "USAGE";
 $script ($script_version)
-Copyright (c) 2005 Simon Butcher <simon@butcher.name>
+Copyright (c) 2005,2010 Simon Butcher <simon\@butcher.name>
 
 $script_title
 

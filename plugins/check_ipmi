@@ -1,0 +1,244 @@
+#! /usr/bin/perl
+###############################################################################
+#                                                                             #
+#                       Check a host's sensors via IPMI                       #
+#                                                                             #
+###############################################################################
+#
+# Copyright (c) 2007,2010 Simon Butcher <simon@butcher.name>
+#  
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA    02111-1307    USA
+#
+##############################################################################
+
+use strict;
+use Getopt::Std;
+
+my $script = "check_ipmi";
+my $script_title =
+  "Check the status of a host's sensors via IPMI";
+my $script_version = "20100322";
+
+# The location of IPMITOOL (you may need to change this)
+my $ipmitool = "/usr/bin/ipmitool";
+
+# Our return status - we start with 0 (OK) and hope for the best
+my $status = 0;
+
+# Our return string with lots of interesting stuff in it
+my $returnstr = "";
+
+# The authentication settings
+my $hostname = "127.0.0.1";
+my $username = "root";
+my $password = "changeme";
+
+
+# Grab the command line options
+getopts("h:H:u:p:d:");
+
+# If we didn't get any options, show some help and quit
+if ($Getopt::Std::opt_h) {
+    usage();
+    exit(-1); # Unknown
+}
+
+# Get the hostname, if it was given..
+if (defined($Getopt::Std::opt_H)) {
+    $hostname = $Getopt::Std::opt_H;
+} else {
+    # We really need a hostname
+    usage();
+    exit(-1); # Unknown
+}
+
+# Get the username
+if (defined($Getopt::Std::opt_p)) {
+    $username = $Getopt::Std::opt_u;
+}
+
+# Get the password
+if (defined($Getopt::Std::opt_p)) {
+    $password = $Getopt::Std::opt_p;
+}
+
+
+# Built the base IPMI command - Dell or otherwise?
+my $ipmi;
+if (defined($Getopt::Std::opt_d) &&
+    ($Getopt::Std::opt_d == "dell")) {
+    $ipmi = "$ipmitool -I lan -H $hostname -U $username -P $password";
+} else {
+    $ipmi = "$ipmitool -I lan -H $hostname -L user -A password -U $username -P $password";
+}
+
+
+# Grab the sensor dump via IPMITOOL
+my @sensors = `$ipmi sensor list`;
+my $sensor_count_total = 0;
+my $sensor_count_tested = 0;
+
+# Loop over the sensors to find anything out of place
+foreach (@sensors) {
+    # Increase the total sensor count
+    $sensor_count_total++;
+    
+    # Split the line up and grab info we want
+    my @data = split(/\|/, $_);
+    my $sensor_name = trim(@data[0]);
+    my $sensor_value = trim(@data[1]);
+    my $sensor_units = trim(@data[2]);
+    my $sensor_thresh_lower_fail = trim(@data[4]);
+    my $sensor_thresh_lower_critical = trim(@data[5]);
+    my $sensor_thresh_lower_warning = trim(@data[6]);
+    my $sensor_thresh_upper_warning = trim(@data[7]);
+    my $sensor_thresh_upper_critical = trim(@data[8]);
+    my $sensor_thresh_upper_fail = trim(@data[9]);
+
+    # Is this sensor valid for reading?
+    if ($sensor_value != "na") {
+	# Increase the tested sensor count
+	$sensor_count_tested++;
+    
+	# Check the status
+	if (($sensor_thresh_lower_fail != "na") &&
+	    ($sensor_thresh_lower_fail >= $sensor_value)) {
+	    status(2); # Critical
+	    $returnstr .= 
+	        ", " . $sensor_name . " DAMAGED (" . $sensor_value .
+		"<" . $sensor_thresh_lower_fail . " " . $sensor_units .
+		")";
+	} elsif (($sensor_thresh_upper_fail != "na") &&
+	         ($sensor_thresh_upper_fail <= $sensor_value)) {
+	    status(2); # Critical
+	    $returnstr .= 
+	        ", " . $sensor_name . " DAMAGED (" . $sensor_value .
+		">" . $sensor_thresh_upper_fail . " " . $sensor_units .
+		")";
+        } elsif (($sensor_thresh_lower_critical != "na") &&
+	         ($sensor_thresh_lower_critical >= $sensor_value)) {
+	    status(2); # Critical
+	    $returnstr .= 
+	        ", " . $sensor_name . " CRITICAL (" . $sensor_value .
+		"<" . $sensor_thresh_lower_critical . " " . $sensor_units .
+		")";
+	} elsif (($sensor_thresh_upper_critical != "na") &&
+	         ($sensor_thresh_upper_critical <= $sensor_value)) {
+	    status(2); # Critical
+	    $returnstr .= 
+	        ", " . $sensor_name . " CRITICAL (" . $sensor_value .
+		">" . $sensor_thresh_upper_critical . " " . $sensor_units .
+		")";
+	} elsif (($sensor_thresh_lower_warning != "na") &&
+	         ($sensor_thresh_lower_warning >= $sensor_value)) {
+	    status(1); # Warning
+	    $returnstr .= 
+	        ", " . $sensor_name . " WARNING (" . $sensor_value .
+		"<" . $sensor_thresh_lower_warning . " " . $sensor_units .
+		")";
+	} elsif (($sensor_thresh_upper_warning != "na") &&
+	         ($sensor_thresh_upper_warning <= $sensor_value)) {
+	    status(2); # Warning
+	    $returnstr .= 
+	        ", " . $sensor_name . " WARNING (" . $sensor_value .
+		">" . $sensor_thresh_upper_warning . " " . $sensor_units .
+		")";
+	}
+    }
+}
+
+# If we found no sensors, something's suspicious..
+if ($sensor_count_total <= 0) {
+    status(1); # Warning
+    $returnstr .= ", couldn't test sensors";
+} else {
+    $returnstr .= 
+        " (tested " . $sensor_count_tested . "/" . $sensor_count_total . " sensors)";
+}
+
+
+# Complete the return string
+if ($status == 2) {
+    $returnstr = "CRITICAL" . $returnstr;
+} elsif ($status == 1) {
+    $returnstr = "WARNING" . $returnstr;
+} elsif ($status == 0) {
+    $returnstr = "OK" . $returnstr;
+} else {
+    $returnstr = "UNKNOWN" . $returnstr;
+}
+$returnstr = "IPMI " . $returnstr;
+
+# Return the return string and return status
+print "$returnstr\n";
+exit($status);
+
+
+##############################################################################
+##############################################################################
+#
+# Trim whitespace
+#
+sub trim {
+    my $string = shift;
+    $string =~ s/^\s+//;
+    $string =~ s/\s+$//;
+    return $string;
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Change the status level
+#
+sub status {
+    my $newstatus = $_[0];
+
+    # If the new status is greater than the old status, change the old status
+    if ($newstatus > $status) {
+	$status = $newstatus;
+    }
+}
+
+
+##############################################################################
+##############################################################################
+#
+# Usage information
+#
+sub usage {
+    print << "USAGE";
+$script ($script_version)
+Copyright (c) 2007,2010 Simon Butcher <simon\@butcher.name>
+
+$script_title
+
+Usage: $script -H <hostname> [ -u <username> ] [ -p <password> ]
+           [ -d dell ]
+
+Options:
+    -H 	Hostname or IP address (normally of the BMC)
+    -u  Username used for authentication (default: root)
+    -p  Password used for authentication (default: changeme)
+    -d  Host type (presently only "dell" is supported, omit for defaults)
+
+Note: IPMI queries tend to be quite slow due; you may need to increase the
+      plugin check timeout for some hosts, particular those with a slow BMC
+      and/or a large number of sensors to test.
+    
+USAGE
+     exit(-1); # Unknown
+}

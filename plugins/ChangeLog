@@ -1,3 +1,15 @@
+Release 20100322
+----------------
+ * Adding generic IPMI check (tests all sensors). Known to work with Dell and
+   Sun systems, unsure on others. IPMI is only supported over the "lan"
+   interface and tends to be quite slow.
+ * Cleaned up code for "use strict" flag.
+   (Thanks to Jean-Francois Panisset)
+ * Minor fixes/modifications to help texts.
+ * Changes to performance data output to better support data collection when
+   Nagios itself is embedded in other products such as Centreon.
+   (Thanks to Julien Breton)
+
 Release 20070709
 ----------------
  * Adding support for Riverbed Steelhead network accellerator appliance
